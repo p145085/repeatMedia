@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loopable Media Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #player-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .controls {
+            margin-top: 10px;
+        }
+        .controls button {
+            margin: 5px;
+        }
+        .time-inputs {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .time-inputs input {
+            width: 60px;
+        }
+        .error {
+            border: 2px solid red;
+            background-color: #ffe6e6;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="player-container">
+        <h1>Loopable Media Player</h1>
+
+        <p>Upload a .webm or a audio file and use the controls below to set your loop values.</p>
+        
+        <!-- File Upload -->
+        <input type="file" id="fileInput" accept="audio/*, video/*" />
+        <br/><br/>
+        
+        <div id="mediaControls" class="controls" style="display:none;">
+            <h3>Set Loop Start and End Time</h3>
+            
+            <label for="start-time">Start Time:</label>
+            <div class="time-inputs">
+                <input type="number" id="start-minutes" value="0" min="0" step="1" />
+                <span>:</span>
+                <input type="number" id="start-seconds" value="0" min="0" max="59" step="1" />
+                <span>:</span>
+                <input type="number" id="start-milliseconds" value="0" min="0" max="999" step="1" />
+            </div>
+            <input type="range" id="start-slider" min="0" value="0" step="0.001">
+            <span id="start-time-display">0.000</span> sec
+            <br/><br/>
+            
+            <label for="end-time">End Time:</label>
+            <div class="time-inputs">
+                <input type="number" id="end-minutes" value="0" min="0" step="1" />
+                <span>:</span>
+                <input type="number" id="end-seconds" value="30" min="0" max="59" step="1" />
+                <span>:</span>
+                <input type="number" id="end-milliseconds" value="0" min="0" max="999" step="1" />
+            </div>
+            <input type="range" id="end-slider" min="0" value="30" step="0.001">
+            <span id="end-time-display">30.000</span> sec
+            <br/><br/>
+            
+            <button id="toggleLoop">Start Loop</button>
+            <br/>
+            <button id="resetLoop">Reset Loop</button>
+        </div>
+
+        <div id="playerWrapper">
+            <!-- Video or Audio Player will be injected here -->
+        </div>
+    </div>
+
+    <script>
+        let mediaElement = null;
+        let isLooping = false;
+        let startTime = 0;
+        let endTime = 30;
+
+        // Event listeners
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        document.getElementById('toggleLoop').addEventListener('click', toggleLoop);
+        document.getElementById('resetLoop').addEventListener('click', resetLoop);
+        document.getElementById('start-slider').addEventListener('input', updateStartTimeFromSlider);
+        document.getElementById('end-slider').addEventListener('input', updateEndTimeFromSlider);
+
+        document.getElementById('start-minutes').addEventListener('input', updateStartTimeManually);
+        document.getElementById('start-seconds').addEventListener('input', updateStartTimeManually);
+        document.getElementById('start-milliseconds').addEventListener('input', updateStartTimeManually);
+        document.getElementById('end-minutes').addEventListener('input', updateEndTimeManually);
+        document.getElementById('end-seconds').addEventListener('input', updateEndTimeManually);
+        document.getElementById('end-milliseconds').addEventListener('input', updateEndTimeManually);
+
+        function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const mediaWrapper = document.getElementById('playerWrapper');
+        mediaWrapper.innerHTML = ''; // Clear any existing media
+
+        if (file.type.startsWith('video')) {
+            mediaElement = document.createElement('video');
+            mediaElement.src = URL.createObjectURL(file);
+            mediaElement.controls = true;
+            mediaElement.id = "media-player";
+            mediaWrapper.appendChild(mediaElement);
+        } else if (file.type.startsWith('audio')) {
+            mediaElement = document.createElement('audio');
+            mediaElement.src = URL.createObjectURL(file);
+            mediaElement.controls = true;
+            mediaElement.id = "media-player";
+            mediaWrapper.appendChild(mediaElement);
+        }
+
+        document.getElementById('mediaControls').style.display = 'block';
+
+        // Wait for the media to load to determine duration
+        mediaElement.addEventListener('loadedmetadata', () => {
+            const duration = mediaElement.duration;
+            
+            // Set default loop values
+            startTime = 0;
+            endTime = duration;
+
+            // Update sliders
+            document.getElementById('start-slider').max = duration;
+            document.getElementById('start-slider').value = startTime;
+            document.getElementById('end-slider').max = duration;
+            document.getElementById('end-slider').value = endTime;
+
+            // Update input fields
+            updateFields('start', secondsToTimeParts(startTime));
+            updateFields('end', secondsToTimeParts(endTime));
+        });
+
+        mediaElement.addEventListener('timeupdate', checkLoop);
+    }
+}
+
+
+        function checkLoop() {
+            if (startTime >= endTime) {
+                // Stop playback if start time is greater or equal to end time
+                mediaElement.pause();
+                mediaElement.currentTime = startTime; // Reset to start time
+                return;
+            }
+
+            // Normal looping behavior
+            if (isLooping && mediaElement.currentTime >= endTime) {
+                mediaElement.currentTime = startTime;
+                mediaElement.play();
+            }
+        }
+
+        function toggleLoop() {
+            isLooping = !isLooping;
+
+            if (mediaElement) {
+                if (isLooping) {
+                    mediaElement.currentTime = startTime;
+                    mediaElement.play();
+                    document.getElementById('toggleLoop').innerText = 'Stop Loop';
+                } else {
+                    mediaElement.pause();
+                    document.getElementById('toggleLoop').innerText = 'Start Loop';
+                }
+            }
+        }
+
+        function resetLoop() {
+            isLooping = false;
+            if (mediaElement) {
+                mediaElement.currentTime = 0;
+                mediaElement.pause();
+            }
+
+            startTime = 0;
+            endTime = mediaElement?.duration || 0;
+
+            // Update sliders
+            document.getElementById('start-slider').value = startTime;
+            document.getElementById('end-slider').value = endTime;
+
+            // Update input fields
+            updateFields('start', secondsToTimeParts(startTime));
+            updateFields('end', secondsToTimeParts(endTime));
+
+            document.getElementById('toggleLoop').innerText = 'Start Loop';
+        }
+
+
+        function updateStartTimeFromSlider() {
+            startTime = parseFloat(document.getElementById('start-slider').value);
+            const timeParts = secondsToTimeParts(startTime);
+            updateFields('start', timeParts);
+
+            // Validate after updating the start time
+            validateTimeInputs();
+        }
+
+        function updateEndTimeFromSlider() {
+            endTime = parseFloat(document.getElementById('end-slider').value);
+            const timeParts = secondsToTimeParts(endTime);
+            updateFields('end', timeParts);
+
+            // Validate after updating the end time
+            validateTimeInputs();
+        }
+
+        function updateStartTimeManually() {
+            const startParts = getFields('start'); // Get the MM:SS:MSMS parts from the input fields
+            startTime = timePartsToSeconds(startParts); // Convert to seconds
+
+            // Update the slider position for the start time
+            const startSlider = document.getElementById('start-slider');
+            startSlider.value = startTime;
+
+            // Update the start-time-display string
+            const startTimeDisplay = document.getElementById('start-time-display');
+            startTimeDisplay.textContent = formatTimeDisplay(startTime);
+
+            // Validate time inputs
+            validateTimeInputs();
+        }
+
+
+        function updateEndTimeManually() {
+            const endParts = getFields('end'); // Get the MM:SS:MSMS parts from the input fields
+            endTime = timePartsToSeconds(endParts); // Convert to seconds
+
+            // Update the slider position for the end time
+            const endSlider = document.getElementById('end-slider');
+            endSlider.value = endTime;
+
+            // Update the end-time-display string
+            const endTimeDisplay = document.getElementById('end-time-display');
+            endTimeDisplay.textContent = formatTimeDisplay(endTime);
+
+            // Validate time inputs
+            validateTimeInputs();
+        }
+
+        function formatTimeDisplay(seconds) {
+            const { minutes, seconds: secs, milliseconds } = secondsToTimeParts(seconds);
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}:${String(milliseconds).padStart(3, '0')}`;
+        }
+
+
+
+        function updateFields(type, { minutes, seconds, milliseconds }) {
+            document.getElementById(`${type}-minutes`).value = minutes;
+            document.getElementById(`${type}-seconds`).value = seconds;
+            document.getElementById(`${type}-milliseconds`).value = milliseconds;
+            document.getElementById(`${type}-time-display`).innerText = (minutes * 60 + seconds + milliseconds / 1000).toFixed(3);
+        }
+
+        function getFields(type) {
+            return {
+                minutes: parseInt(document.getElementById(`${type}-minutes`).value, 10) || 0,
+                seconds: parseInt(document.getElementById(`${type}-seconds`).value, 10) || 0,
+                milliseconds: parseInt(document.getElementById(`${type}-milliseconds`).value, 10) || 0
+            };
+        }
+
+        function secondsToTimeParts(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            seconds = seconds % 60;
+            const milliseconds = Math.floor((seconds - Math.floor(seconds)) * 1000);
+            return { minutes, seconds: Math.floor(seconds), milliseconds };
+        }
+
+        function timePartsToSeconds({ minutes, seconds, milliseconds }) {
+            return minutes * 60 + seconds + milliseconds / 1000;
+        }
+
+        function validateTimeInputs() {
+            const startFields = getFields('start');
+            const endFields = getFields('end');
+
+            const startSeconds = timePartsToSeconds(startFields);
+            const endSeconds = timePartsToSeconds(endFields);
+
+            const startInputs = [
+                document.getElementById('start-minutes'),
+                document.getElementById('start-seconds'),
+                document.getElementById('start-milliseconds')
+            ];
+            const endInputs = [
+                document.getElementById('end-minutes'),
+                document.getElementById('end-seconds'),
+                document.getElementById('end-milliseconds')
+            ];
+
+            if (startSeconds > endSeconds) {
+                // Add the red theme to both start and end inputs
+                startInputs.forEach(input => input.classList.add('error'));
+                endInputs.forEach(input => input.classList.add('error'));
+
+                // Pause playback if invalid loop
+                if (mediaElement && !mediaElement.paused) {
+                    mediaElement.pause();
+                }
+            } else {
+                // Remove the red theme if the times are valid
+                startInputs.forEach(input => input.classList.remove('error'));
+                endInputs.forEach(input => input.classList.remove('error'));
+            }
+        }
+
+
+    </script>
+</body>
+</html>
