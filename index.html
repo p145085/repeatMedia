@@ -31,12 +31,12 @@
             margin-bottom: 20px;
         }
         .input-sources {
-            grid-column: 1;
-            grid-row: 1;
+            width: 100%;
             padding: 25px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         .controls {
             grid-column: 2;
@@ -47,15 +47,28 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         #playerWrapper {
-            grid-column: 1 / -1;
-            grid-row: 2;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 16/9; /* Maintains video aspect ratio */
+        }
+        #playerWrapper iframe,
+        #playerWrapper video,
+        #playerWrapper audio {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+        }
+        /* Special handling for audio elements */
+        #playerWrapper audio {
+            position: relative;
+            height: auto;
+            min-height: 50px;
         }
         .time-inputs {
             display: flex;
@@ -150,54 +163,113 @@
         .footer-container {
             display: none;
         }
+        #playlist-container {
+            width: 100%;
+            padding: 25px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .playlist {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .playlist-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            gap: 10px;
+        }
+        .playlist-item:last-child {
+            border-bottom: none;
+        }
+        .playlist-item-title {
+            flex-grow: 1;
+        }
+        .playlist-item button {
+            padding: 5px 10px;
+            margin-left: 5px;
+        }
+        .playlist-item.active {
+            background-color: #e3f2fd;
+        }
+        #filePickerButton {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .playlist-item.disabled {
+            opacity: 0.5;
+        }
+        
+        .playlist-item.disabled .play-btn {
+            cursor: not-allowed;
+        }
+        #directoryPickerButton {
+            width: 100%;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
 
     <div class="page-container">
-        <div id="player-container">
-            <div class="input-sources">
-                <h1>Media Sources</h1>
-                <input type="file" id="fileInput" accept="audio/*, video/*" />
-                <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL">
-                <button id="loadYoutube">Load YouTube Video</button>
-            </div>
+        <div class="input-sources">
+            <h1>Media Sources</h1>
+            <button id="filePickerButton">Choose Files</button>
+            <button id="directoryPickerButton">Choose Directory</button>
+            <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL">
+            <button id="loadYoutube">Load YouTube Video</button>
+        </div>
 
-            <div id="mediaControls" class="controls" style="display:none;">
-                <h1>Playback Controls</h1>
-                <div class="control-group">
-                    <label for="start-time">Start Time:</label>
-                    <div class="time-inputs">
-                        <input type="number" id="start-minutes" value="0" min="0" step="1" />
-                        <span>:</span>
-                        <input type="number" id="start-seconds" value="0" min="0" max="59" step="1" />
-                        <span>:</span>
-                        <input type="number" id="start-milliseconds" value="0" min="0" max="999" step="1" />
-                    </div>
-                    <input type="range" id="start-slider" min="0" value="0" step="0.001">
-                    <span id="start-time-display">0.000</span> sec
+        <div id="playlist-container">
+            <h1>Playlist</h1>
+            <div id="playlist" class="playlist">
+                <!-- Playlist items will be added here dynamically -->
+            </div>
+        </div>
+
+        <div id="mediaControls" class="controls" style="display:none;">
+            <h1>Playback Controls</h1>
+            <div class="control-group">
+                <label for="start-time">Start Time:</label>
+                <div class="time-inputs">
+                    <input type="number" id="start-minutes" value="0" min="0" step="1" />
+                    <span>:</span>
+                    <input type="number" id="start-seconds" value="0" min="0" max="59" step="1" />
+                    <span>:</span>
+                    <input type="number" id="start-milliseconds" value="0" min="0" max="999" step="1" />
                 </div>
+                <input type="range" id="start-slider" min="0" value="0" step="0.001">
+                <span id="start-time-display">0.000</span> sec
+            </div>
 
-                <div class="control-group">
-                    <label for="end-time">End Time:</label>
-                    <div class="time-inputs">
-                        <input type="number" id="end-minutes" value="0" min="0" step="1" />
-                        <span>:</span>
-                        <input type="number" id="end-seconds" value="30" min="0" max="59" step="1" />
-                        <span>:</span>
-                        <input type="number" id="end-milliseconds" value="0" min="0" max="999" step="1" />
-                    </div>
-                    <input type="range" id="end-slider" min="0" value="30" step="0.001">
-                    <span id="end-time-display">30.000</span> sec
+            <div class="control-group">
+                <label for="end-time">End Time:</label>
+                <div class="time-inputs">
+                    <input type="number" id="end-minutes" value="0" min="0" step="1" />
+                    <span>:</span>
+                    <input type="number" id="end-seconds" value="30" min="0" max="59" step="1" />
+                    <span>:</span>
+                    <input type="number" id="end-milliseconds" value="0" min="0" max="999" step="1" />
                 </div>
-
-                <button id="toggleLoop">Start Loop</button>
-                <button id="resetLoop">Reset Loop</button>
+                <input type="range" id="end-slider" min="0" value="30" step="0.001">
+                <span id="end-time-display">30.000</span> sec
             </div>
 
-            <div id="playerWrapper">
-                <div id="youtubePlayer"></div>
+            <button id="toggleLoop">Start Loop</button>
+            <button id="resetLoop">Reset Loop</button>
+
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="continuePlaylist"> Continue to next item
+                </label>
             </div>
+        </div>
+
+        <div id="playerWrapper">
+            <div id="youtubePlayer"></div>
         </div>
 
         <div class="wallet-info">
@@ -211,14 +283,142 @@
 
     <script>
         let mediaElement = null;
-        let isLooping = false;
+        let isLooping = true;
         let startTime = 0;
         let endTime = 30;
         let youtubePlayer = null;
         let isYoutubeVideo = false;
+        let playlist = [];
+        let currentPlayingIndex = -1;
+        let continuePlaylist = false;
+        let db;
 
-        // Event listeners
-        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('mediaFiles', 1);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('files')) {
+                        db.createObjectStore('files');
+                    }
+                };
+            });
+        };
+
+        async function storeFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    try {
+                        const transaction = db.transaction(['files'], 'readwrite');
+                        const store = transaction.objectStore('files');
+                        await store.put(reader.result, file.name);
+                        resolve();
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function getFile(name) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['files'], 'readonly');
+                const store = transaction.objectStore('files');
+                const request = store.get(name);
+                
+                request.onsuccess = () => {
+                    if (request.result) {
+                        // Convert ArrayBuffer back to File
+                        const file = new File([request.result], name, {
+                            type: name.endsWith('.mp4') || name.endsWith('.webm') ? 'video/mp4' : 'audio/mp3'
+                        });
+                        resolve(file);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Update the file picker event listener to handle initialization errors
+        document.getElementById('filePickerButton').addEventListener('click', async () => {
+            try {
+                if (!db) {
+                    await initDB();
+                }
+
+                const handles = await window.showOpenFilePicker({
+                    multiple: true,
+                    types: [
+                        {
+                            description: 'Media Files',
+                            accept: {
+                                'audio/*': ['.mp3', '.wav', '.ogg'],
+                                'video/*': ['.mp4', '.webm', '.mov']
+                            }
+                        }
+                    ]
+                });
+
+                for (const handle of handles) {
+                    const file = await handle.getFile();
+                    if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                        await storeFile(file);
+                        addToPlaylist({
+                            type: 'file',
+                            file: file,
+                            title: file.name
+                        });
+                    }
+                }
+                savePlaylist();
+            } catch (err) {
+                console.error('Error selecting files:', err);
+            }
+        });
+
+        // Add the directory picker event listener
+        document.getElementById('directoryPickerButton').addEventListener('click', async () => {
+            try {
+                if (!db) {
+                    await initDB();
+                }
+
+                const dirHandle = await window.showDirectoryPicker();
+                
+                // Get all media files from the directory
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file') {
+                        const file = await entry.getFile();
+                        if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                            // Store the file in IndexedDB
+                            await storeFile(file);
+                            
+                            addToPlaylist({
+                                type: 'file',
+                                file: file,
+                                title: file.name
+                            });
+                        }
+                    }
+                }
+                savePlaylist();
+            } catch (err) {
+                console.error('Error selecting directory:', err);
+            }
+        });
+
         document.getElementById('toggleLoop').addEventListener('click', toggleLoop);
         document.getElementById('resetLoop').addEventListener('click', resetLoop);
         document.getElementById('start-slider').addEventListener('input', updateStartTimeFromSlider);
@@ -234,9 +434,6 @@
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (file) {
-                // Reset both inputs' styles first
-                resetSourceStyles();
-                
                 // Update input styling
                 document.getElementById('fileInput').classList.add('active-source');
                 document.getElementById('youtubeUrl').classList.add('inactive-source');
@@ -485,65 +682,50 @@
         }
 
         function onYouTubeIframeAPIReady() {
-            // This function will be called when the YouTube API is ready
-            document.getElementById('loadYoutube').addEventListener('click', loadYoutubeVideo);
-        }
-
-        function loadYoutubeVideo() {
-            const url = document.getElementById('youtubeUrl').value;
-            const videoId = getYoutubeId(url);
-            
-            if (!videoId) return;
-
-            // Reset both inputs' styles first
-            resetSourceStyles();
-            
-            // Update input styling
-            document.getElementById('youtubeUrl').classList.add('active-source');
-            document.getElementById('fileInput').classList.add('inactive-source');
-            document.getElementById('fileInput').value = ''; // Clear file input
-
-            // Clear any existing media
-            if (mediaElement) {
-                mediaElement.pause();
-                mediaElement.remove();
-                mediaElement = null;
-            }
-
-            // Reset player wrapper
-            const mediaWrapper = document.getElementById('playerWrapper');
-            mediaWrapper.innerHTML = '<div id="youtubePlayer"></div>';
-            
-            isYoutubeVideo = true;
-            
-            // Reset loop state
-            isLooping = false;
-            document.getElementById('toggleLoop').innerText = 'Start Loop';
-
-            // Destroy existing YouTube player if it exists
-            if (youtubePlayer) {
-                youtubePlayer.destroy();
-            }
-
-            // Create new YouTube player with modified options
-            youtubePlayer = new YT.Player('youtubePlayer', {
-                height: '360',
-                width: '640',
-                videoId: videoId,
-                playerVars: {
-                    'rel': 0,            // Disable related videos
-                    'controls': 1,       // Show controls
-                    'showinfo': 0,       // Hide video title
-                    'loop': 1,          // Enable looping
-                    'playlist': videoId  // Required for looping
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
+            // Add click handler for the Load YouTube button
+            document.getElementById('loadYoutube').addEventListener('click', () => {
+                const url = document.getElementById('youtubeUrl').value;
+                if (url) {
+                    loadYoutubeVideo(url);
+                    // Clear the input after loading
+                    document.getElementById('youtubeUrl').value = '';
                 }
             });
-            
-            document.getElementById('mediaControls').style.display = 'block';
+        }
+
+        async function loadYoutubeVideo(url) {
+            const videoId = getYoutubeId(url);
+            if (!videoId) {
+                console.error('Invalid YouTube URL');
+                return;
+            }
+
+            try {
+                // Get video title using YouTube API
+                const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+                const data = await response.json();
+                const title = data.title || 'YouTube Video';
+
+                const wasEmpty = playlist.length === 0;
+                const newIndex = playlist.length;  // Get the index where the new item will be
+
+                addToPlaylist({
+                    type: 'youtube',
+                    videoId: videoId,
+                    title: title
+                });
+
+                savePlaylist();
+
+                // Autoplay if it's the first item or play immediately if playlist wasn't empty
+                if (wasEmpty) {
+                    playItem(0);
+                } else {
+                    playItem(newIndex);  // Play the newly added item
+                }
+            } catch (err) {
+                console.error('Error loading YouTube video:', err);
+            }
         }
 
         function onPlayerReady(event) {
@@ -572,15 +754,15 @@
 
         function onPlayerStateChange(event) {
             if (event.data === YT.PlayerState.PLAYING) {
-                // Start checking the loop
                 if (!window.youtubeChecker) {
                     window.youtubeChecker = setInterval(checkYoutubeLoop, 100);
                 }
             } else if (event.data === YT.PlayerState.ENDED) {
-                // Video ended - restart from start time if looping
                 if (isLooping) {
                     youtubePlayer.seekTo(startTime);
                     youtubePlayer.playVideo();
+                } else if (continuePlaylist) {
+                    handleMediaEnd();
                 }
             }
         }
@@ -604,25 +786,240 @@
             }
         }
 
-        function resetSourceStyles() {
-            const youtubeInput = document.getElementById('youtubeUrl');
-            const fileInput = document.getElementById('fileInput');
+        // Generate QR code
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await initDB();
+                
+                // Initialize QR code
+                new QRCode(document.getElementById("qrcode"), {
+                    text: "0xaf8817fe4ec64888f8a4586cf6b1432058a80066",
+                    width: 128,
+                    height: 128,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+
+                // Load playlist
+                const savedPlaylist = JSON.parse(localStorage.getItem('playlist')) || [];
+                playlist = [];
+
+                for (const item of savedPlaylist) {
+                    if (item.type === 'youtube') {
+                        playlist.push(item);
+                    } else if (item.type === 'file') {
+                        try {
+                            const file = await getFile(item.title);
+                            if (file) {
+                                playlist.push({
+                                    type: 'file',
+                                    file: file,
+                                    title: item.title
+                                });
+                            } else {
+                                throw new Error('File not found in storage');
+                            }
+                        } catch (err) {
+                            console.warn(`Could not load file: ${item.title}`, err);
+                            playlist.push({
+                                ...item,
+                                disabled: true,
+                                title: `${item.title} (File not found)`
+                            });
+                        }
+                    }
+                }
+                renderPlaylist();
+            } catch (err) {
+                console.error('Error during initialization:', err);
+            }
+        });
+
+        function addToPlaylist(item) {
+            const wasEmpty = playlist.length === 0;
+            playlist.push(item);
+            renderPlaylist();
             
-            youtubeInput.classList.remove('active-source', 'inactive-source');
-            fileInput.classList.remove('active-source', 'inactive-source');
+            // Autoplay if this is the first item
+            if (wasEmpty) {
+                playItem(playlist.length - 1);
+            }
         }
 
-        // Generate QR code
-        window.onload = function() {
-            new QRCode(document.getElementById("qrcode"), {
-                text: "0xaf8817fe4ec64888f8a4586cf6b1432058a80066",
-                width: 128,
-                height: 128,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
+        function renderPlaylist() {
+            const playlistEl = document.getElementById('playlist');
+            playlistEl.innerHTML = '';
+
+            playlist.forEach((item, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = `playlist-item ${index === currentPlayingIndex ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`;
+                
+                itemEl.innerHTML = `
+                    <span class="playlist-item-title">${item.title}</span>
+                    <button class="play-btn" ${item.disabled ? 'disabled' : ''}>${index === currentPlayingIndex ? 'Playing' : 'Play'}</button>
+                    <button class="remove-btn">Remove</button>
+                `;
+
+                if (!item.disabled) {
+                    itemEl.querySelector('.play-btn').addEventListener('click', () => playItem(index));
+                }
+                itemEl.querySelector('.remove-btn').addEventListener('click', () => removeItem(index));
+                
+                playlistEl.appendChild(itemEl);
             });
-        };
+        }
+
+        function playItem(index) {
+            currentPlayingIndex = index;
+            const item = playlist[index];
+
+            if (!item) return; // Guard against invalid items
+
+            if (item.type === 'youtube') {
+                if (youtubePlayer) {
+                    youtubePlayer.destroy();
+                }
+                
+                const mediaWrapper = document.getElementById('playerWrapper');
+                mediaWrapper.innerHTML = '<div id="youtubePlayer"></div>';
+                
+                youtubePlayer = new YT.Player('youtubePlayer', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: item.videoId,
+                    playerVars: {
+                        'rel': 0,
+                        'controls': 1,
+                        'showinfo': 0,
+                        'autoplay': 1,
+                        'loop': 1,
+                        'playlist': item.videoId
+                    },
+                    events: {
+                        'onReady': onPlayerReady,
+                        'onStateChange': onPlayerStateChange
+                    }
+                });
+            } else if (item.type === 'file' && item.file) {
+                playLocalFile(item.file);
+            }
+
+            document.getElementById('mediaControls').style.display = 'block';
+            renderPlaylist();
+        }
+
+        function removeItem(index) {
+            playlist.splice(index, 1);
+            if (index === currentPlayingIndex) {
+                // Stop current playback
+                if (youtubePlayer) {
+                    youtubePlayer.stopVideo();
+                }
+                if (mediaElement) {
+                    mediaElement.pause();
+                    mediaElement.remove();
+                    mediaElement = null;
+                }
+                currentPlayingIndex = -1;
+            }
+            savePlaylist();
+            renderPlaylist();
+        }
+
+        function savePlaylist() {
+            const playlistData = playlist.map(item => ({
+                type: item.type,
+                title: item.title,
+                videoId: item.type === 'youtube' ? item.videoId : undefined
+            }));
+            localStorage.setItem('playlist', JSON.stringify(playlistData));
+        }
+
+        function handleMediaEnd() {
+            if (continuePlaylist) {
+                let nextIndex = currentPlayingIndex + 1;
+                if (nextIndex >= playlist.length) {
+                    nextIndex = 0; // Loop back to the beginning
+                }
+                if (nextIndex !== currentPlayingIndex) {
+                    playItem(nextIndex);
+                }
+            }
+        }
+
+        function playLocalFile(file) {
+            if (!file) return; // Guard against missing files
+
+            // Clear YouTube player if it exists
+            if (youtubePlayer) {
+                youtubePlayer.destroy();
+                youtubePlayer = null;
+            }
+            isYoutubeVideo = false;
+
+            // Clear existing media element if it exists
+            if (mediaElement) {
+                mediaElement.pause();
+                mediaElement.remove();
+                mediaElement = null;
+            }
+
+            const mediaWrapper = document.getElementById('playerWrapper');
+            mediaWrapper.innerHTML = '<div id="youtubePlayer"></div>';
+
+            // Check if file is a valid media file
+            if (file.type && (file.type.startsWith('video') || file.type.startsWith('audio'))) {
+                mediaElement = document.createElement(file.type.startsWith('video') ? 'video' : 'audio');
+                mediaElement.src = URL.createObjectURL(file);
+                mediaElement.controls = true;
+                mediaElement.id = "media-player";
+                mediaWrapper.appendChild(mediaElement);
+
+                document.getElementById('mediaControls').style.display = 'block';
+
+                mediaElement.addEventListener('loadedmetadata', () => {
+                    const duration = mediaElement.duration;
+                    startTime = 0;
+                    endTime = duration;
+
+                    document.getElementById('start-slider').max = duration;
+                    document.getElementById('start-slider').value = startTime;
+                    document.getElementById('end-slider').max = duration;
+                    document.getElementById('end-slider').value = endTime;
+
+                    updateFields('start', secondsToTimeParts(startTime));
+                    updateFields('end', secondsToTimeParts(endTime));
+                    
+                    // Autoplay when loaded
+                    mediaElement.play();
+                });
+
+                mediaElement.addEventListener('timeupdate', checkLoop);
+                mediaElement.addEventListener('ended', handleMediaEnd);
+            } else {
+                console.error('Invalid file type:', file.type);
+            }
+        }
+
+        // Add event listener for the continue checkbox
+        document.getElementById('continuePlaylist').addEventListener('change', (e) => {
+            continuePlaylist = e.target.checked;
+        });
+
+        // Update the initial button text since looping is enabled by default
+        document.getElementById('toggleLoop').innerText = 'Stop Loop';
+
+        // Optional: Add an event listener for the Enter key in the YouTube URL input
+        document.getElementById('youtubeUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const url = e.target.value;
+                if (url) {
+                    loadYoutubeVideo(url);
+                    e.target.value = '';
+                }
+            }
+        });
 
     </script>
 </body>
