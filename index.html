@@ -63,6 +63,20 @@
             align-items: center;
             margin-bottom: 10px;
         }
+        .time-inputs input[type="number"] {
+            width: 60px;  /* Set fixed width for all number inputs */
+            padding: 5px;
+            text-align: center;
+        }
+        /* Optionally, if you want to hide the spinner buttons */
+        .time-inputs input[type="number"]::-webkit-inner-spin-button,
+        .time-inputs input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .time-inputs input[type="number"] {
+            -moz-appearance: textfield; /* Firefox */
+        }
         input[type="range"] {
             width: 250px; /* Match the width of time inputs */
             margin: 10px 0;
