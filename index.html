@@ -145,7 +145,7 @@
             <div class="input-sources">
                 <h1>Media Sources</h1>
                 <input type="file" id="fileInput" accept="audio/*, video/*" />
-                <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL or Video ID">
+                <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL">
                 <button id="loadYoutube">Load YouTube Video</button>
             </div>
 
@@ -511,11 +511,18 @@
                 youtubePlayer.destroy();
             }
 
-            // Create new YouTube player
+            // Create new YouTube player with modified options
             youtubePlayer = new YT.Player('youtubePlayer', {
                 height: '360',
                 width: '640',
                 videoId: videoId,
+                playerVars: {
+                    'rel': 0,            // Disable related videos
+                    'controls': 1,       // Show controls
+                    'showinfo': 0,       // Hide video title
+                    'loop': 1,          // Enable looping
+                    'playlist': videoId  // Required for looping
+                },
                 events: {
                     'onReady': onPlayerReady,
                     'onStateChange': onPlayerStateChange
@@ -555,9 +562,12 @@
                 if (!window.youtubeChecker) {
                     window.youtubeChecker = setInterval(checkYoutubeLoop, 100);
                 }
-            } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-                clearInterval(window.youtubeChecker);
-                window.youtubeChecker = null;
+            } else if (event.data === YT.PlayerState.ENDED) {
+                // Video ended - restart from start time if looping
+                if (isLooping) {
+                    youtubePlayer.seekTo(startTime);
+                    youtubePlayer.playVideo();
+                }
             }
         }
 
@@ -565,6 +575,7 @@
             if (!youtubePlayer) return;
             
             const currentTime = youtubePlayer.getCurrentTime();
+            const duration = youtubePlayer.getDuration();
             
             if (startTime >= endTime) {
                 youtubePlayer.pauseVideo();
@@ -572,7 +583,9 @@
                 return;
             }
 
-            if (isLooping && currentTime >= endTime) {
+            // Check if we're at or very close to the end time
+            // Using a small threshold to catch the end of the video
+            if (isLooping && (currentTime >= endTime || currentTime >= duration - 0.1)) {
                 youtubePlayer.seekTo(startTime);
             }
         }
