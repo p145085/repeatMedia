@@ -701,14 +701,12 @@
             }
 
             try {
-                // Get video title using YouTube API
                 const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
                 const data = await response.json();
                 const title = data.title || 'YouTube Video';
 
                 const wasEmpty = playlist.length === 0;
-                const newIndex = playlist.length;  // Get the index where the new item will be
-
+                
                 addToPlaylist({
                     type: 'youtube',
                     videoId: videoId,
@@ -717,11 +715,9 @@
 
                 savePlaylist();
 
-                // Autoplay if it's the first item or play immediately if playlist wasn't empty
-                if (wasEmpty) {
+                // Only autoplay if playlist was empty and nothing is currently playing
+                if (wasEmpty && currentPlayingIndex === -1) {
                     playItem(0);
-                } else {
-                    playItem(newIndex);  // Play the newly added item
                 }
             } catch (err) {
                 console.error('Error loading YouTube video:', err);
@@ -758,11 +754,25 @@
                     window.youtubeChecker = setInterval(checkYoutubeLoop, 100);
                 }
             } else if (event.data === YT.PlayerState.ENDED) {
-                if (isLooping) {
+                // Stop checking for loop points
+                if (window.youtubeChecker) {
+                    clearInterval(window.youtubeChecker);
+                    window.youtubeChecker = null;
+                }
+
+                if (isLooping && !continuePlaylist) {
+                    // Only loop if looping is enabled and continue playlist is disabled
                     youtubePlayer.seekTo(startTime);
                     youtubePlayer.playVideo();
                 } else if (continuePlaylist) {
-                    handleMediaEnd();
+                    // Move to next item in playlist
+                    let nextIndex = currentPlayingIndex + 1;
+                    if (nextIndex >= playlist.length) {
+                        nextIndex = 0; // Loop back to the beginning
+                    }
+                    if (nextIndex !== currentPlayingIndex) {
+                        playItem(nextIndex);
+                    }
                 }
             }
         }
@@ -841,8 +851,8 @@
             playlist.push(item);
             renderPlaylist();
             
-            // Autoplay if this is the first item
-            if (wasEmpty) {
+            // Only autoplay if playlist was empty and no media is currently playing
+            if (wasEmpty && currentPlayingIndex === -1) {
                 playItem(playlist.length - 1);
             }
         }
@@ -893,7 +903,7 @@
                         'controls': 1,
                         'showinfo': 0,
                         'autoplay': 1,
-                        'loop': 1,
+                        'loop': 0,  // Disable default looping
                         'playlist': item.videoId
                     },
                     events: {
