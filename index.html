@@ -4,83 +4,194 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loopable Media Player</title>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        .page-container {
+            max-width: 1160px;
+            margin: 0 auto;
+            padding: 20px;
         }
         #player-container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        input[type="range"] {
             width: 100%;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .input-sources {
+            grid-column: 1;
+            grid-row: 1;
+            padding: 25px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .controls {
-            margin-top: 10px;
+            grid-column: 2;
+            grid-row: 1;
+            padding: 25px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .controls button {
-            margin: 5px;
+        #playerWrapper {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .time-inputs {
             display: flex;
             gap: 10px;
             align-items: center;
+            margin-bottom: 10px;
         }
-        .time-inputs input {
-            width: 60px;
+        input[type="range"] {
+            width: 250px; /* Match the width of time inputs */
+            margin: 10px 0;
         }
-        .error {
-            border: 2px solid red;
-            background-color: #ffe6e6;
+        #youtubeUrl {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        #loadYoutube {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 20px;
+        }
+        #fileInput {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .wallet-info {
+            width: 100%;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-sizing: border-box;
+        }
+        .qr-code {
+            width: 128px;
+            height: 128px;
+        }
+        .wallet-address {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .wallet-address span {
+            font-weight: bold;
+            color: #666;
+        }
+        .wallet-address code {
+            font-family: monospace;
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .footer-container {
+            display: none;
         }
     </style>
 </head>
 <body>
 
-    <div id="player-container">
-        <h1>Loopable Media Player</h1>
+    <div class="page-container">
+        <div id="player-container">
+            <div class="input-sources">
+                <h1>Media Sources</h1>
+                <input type="file" id="fileInput" accept="audio/*, video/*" />
+                <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL or Video ID">
+                <button id="loadYoutube">Load YouTube Video</button>
+            </div>
 
-        <p>Upload a .webm or a audio file and use the controls below to set your loop values.</p>
-        
-        <!-- File Upload -->
-        <input type="file" id="fileInput" accept="audio/*, video/*" />
-        <br/><br/>
-        
-        <div id="mediaControls" class="controls" style="display:none;">
-            <h3>Set Loop Start and End Time</h3>
-            
-            <label for="start-time">Start Time:</label>
-            <div class="time-inputs">
-                <input type="number" id="start-minutes" value="0" min="0" step="1" />
-                <span>:</span>
-                <input type="number" id="start-seconds" value="0" min="0" max="59" step="1" />
-                <span>:</span>
-                <input type="number" id="start-milliseconds" value="0" min="0" max="999" step="1" />
+            <div id="mediaControls" class="controls" style="display:none;">
+                <h1>Playback Controls</h1>
+                <div class="control-group">
+                    <label for="start-time">Start Time:</label>
+                    <div class="time-inputs">
+                        <input type="number" id="start-minutes" value="0" min="0" step="1" />
+                        <span>:</span>
+                        <input type="number" id="start-seconds" value="0" min="0" max="59" step="1" />
+                        <span>:</span>
+                        <input type="number" id="start-milliseconds" value="0" min="0" max="999" step="1" />
+                    </div>
+                    <input type="range" id="start-slider" min="0" value="0" step="0.001">
+                    <span id="start-time-display">0.000</span> sec
+                </div>
+
+                <div class="control-group">
+                    <label for="end-time">End Time:</label>
+                    <div class="time-inputs">
+                        <input type="number" id="end-minutes" value="0" min="0" step="1" />
+                        <span>:</span>
+                        <input type="number" id="end-seconds" value="30" min="0" max="59" step="1" />
+                        <span>:</span>
+                        <input type="number" id="end-milliseconds" value="0" min="0" max="999" step="1" />
+                    </div>
+                    <input type="range" id="end-slider" min="0" value="30" step="0.001">
+                    <span id="end-time-display">30.000</span> sec
+                </div>
+
+                <button id="toggleLoop">Start Loop</button>
+                <button id="resetLoop">Reset Loop</button>
             </div>
-            <input type="range" id="start-slider" min="0" value="0" step="0.001">
-            <span id="start-time-display">0.000</span> sec
-            <br/><br/>
-            
-            <label for="end-time">End Time:</label>
-            <div class="time-inputs">
-                <input type="number" id="end-minutes" value="0" min="0" step="1" />
-                <span>:</span>
-                <input type="number" id="end-seconds" value="30" min="0" max="59" step="1" />
-                <span>:</span>
-                <input type="number" id="end-milliseconds" value="0" min="0" max="999" step="1" />
+
+            <div id="playerWrapper">
+                <div id="youtubePlayer"></div>
             </div>
-            <input type="range" id="end-slider" min="0" value="30" step="0.001">
-            <span id="end-time-display">30.000</span> sec
-            <br/><br/>
-            
-            <button id="toggleLoop">Start Loop</button>
-            <br/>
-            <button id="resetLoop">Reset Loop</button>
         </div>
 
-        <div id="playerWrapper">
-            <!-- Video or Audio Player will be injected here -->
+        <div class="wallet-info">
+            <div class="qr-code" id="qrcode"></div>
+            <div class="wallet-address">
+                <span>Donate to the developers Metamask (ERC-20) (BSC):</span>
+                <code>0xaf8817fe4ec64888f8a4586cf6b1432058a80066</code>
+            </div>
         </div>
     </div>
 
@@ -89,6 +200,8 @@
         let isLooping = false;
         let startTime = 0;
         let endTime = 30;
+        let youtubePlayer = null;
+        let isYoutubeVideo = false;
 
         // Event listeners
         document.getElementById('fileInput').addEventListener('change', handleFileUpload);
@@ -105,50 +218,68 @@
         document.getElementById('end-milliseconds').addEventListener('input', updateEndTimeManually);
 
         function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const mediaWrapper = document.getElementById('playerWrapper');
-        mediaWrapper.innerHTML = ''; // Clear any existing media
+            const file = event.target.files[0];
+            if (file) {
+                // Reset both inputs' styles first
+                resetSourceStyles();
+                
+                // Update input styling
+                document.getElementById('fileInput').classList.add('active-source');
+                document.getElementById('youtubeUrl').classList.add('inactive-source');
+                document.getElementById('youtubeUrl').value = ''; // Clear YouTube URL
 
-        if (file.type.startsWith('video')) {
-            mediaElement = document.createElement('video');
-            mediaElement.src = URL.createObjectURL(file);
-            mediaElement.controls = true;
-            mediaElement.id = "media-player";
-            mediaWrapper.appendChild(mediaElement);
-        } else if (file.type.startsWith('audio')) {
-            mediaElement = document.createElement('audio');
-            mediaElement.src = URL.createObjectURL(file);
-            mediaElement.controls = true;
-            mediaElement.id = "media-player";
-            mediaWrapper.appendChild(mediaElement);
+                // Clear YouTube player if it exists
+                if (youtubePlayer) {
+                    youtubePlayer.destroy();
+                    youtubePlayer = null;
+                }
+                isYoutubeVideo = false;
+
+                const mediaWrapper = document.getElementById('playerWrapper');
+                mediaWrapper.innerHTML = '<div id="youtubePlayer"></div>'; // Reset wrapper but keep YouTube placeholder
+
+                if (file.type.startsWith('video')) {
+                    mediaElement = document.createElement('video');
+                    mediaElement.src = URL.createObjectURL(file);
+                    mediaElement.controls = true;
+                    mediaElement.id = "media-player";
+                    mediaWrapper.appendChild(mediaElement);
+                } else if (file.type.startsWith('audio')) {
+                    mediaElement = document.createElement('audio');
+                    mediaElement.src = URL.createObjectURL(file);
+                    mediaElement.controls = true;
+                    mediaElement.id = "media-player";
+                    mediaWrapper.appendChild(mediaElement);
+                }
+
+                document.getElementById('mediaControls').style.display = 'block';
+
+                // Reset loop state
+                isLooping = false;
+                document.getElementById('toggleLoop').innerText = 'Start Loop';
+
+                // Wait for the media to load to determine duration
+                mediaElement.addEventListener('loadedmetadata', () => {
+                    const duration = mediaElement.duration;
+                    
+                    // Reset loop values
+                    startTime = 0;
+                    endTime = duration;
+
+                    // Update sliders
+                    document.getElementById('start-slider').max = duration;
+                    document.getElementById('start-slider').value = startTime;
+                    document.getElementById('end-slider').max = duration;
+                    document.getElementById('end-slider').value = endTime;
+
+                    // Update input fields
+                    updateFields('start', secondsToTimeParts(startTime));
+                    updateFields('end', secondsToTimeParts(endTime));
+                });
+
+                mediaElement.addEventListener('timeupdate', checkLoop);
+            }
         }
-
-        document.getElementById('mediaControls').style.display = 'block';
-
-        // Wait for the media to load to determine duration
-        mediaElement.addEventListener('loadedmetadata', () => {
-            const duration = mediaElement.duration;
-            
-            // Set default loop values
-            startTime = 0;
-            endTime = duration;
-
-            // Update sliders
-            document.getElementById('start-slider').max = duration;
-            document.getElementById('start-slider').value = startTime;
-            document.getElementById('end-slider').max = duration;
-            document.getElementById('end-slider').value = endTime;
-
-            // Update input fields
-            updateFields('start', secondsToTimeParts(startTime));
-            updateFields('end', secondsToTimeParts(endTime));
-        });
-
-        mediaElement.addEventListener('timeupdate', checkLoop);
-    }
-}
-
 
         function checkLoop() {
             if (startTime >= endTime) {
@@ -168,7 +299,16 @@
         function toggleLoop() {
             isLooping = !isLooping;
 
-            if (mediaElement) {
+            if (isYoutubeVideo && youtubePlayer) {
+                if (isLooping) {
+                    youtubePlayer.seekTo(startTime);
+                    youtubePlayer.playVideo();
+                    document.getElementById('toggleLoop').innerText = 'Stop Loop';
+                } else {
+                    youtubePlayer.pauseVideo();
+                    document.getElementById('toggleLoop').innerText = 'Start Loop';
+                }
+            } else if (mediaElement) {
                 if (isLooping) {
                     mediaElement.currentTime = startTime;
                     mediaElement.play();
@@ -182,13 +322,17 @@
 
         function resetLoop() {
             isLooping = false;
-            if (mediaElement) {
+            if (isYoutubeVideo && youtubePlayer) {
+                youtubePlayer.seekTo(0);
+                youtubePlayer.pauseVideo();
+                startTime = 0;
+                endTime = youtubePlayer.getDuration();
+            } else if (mediaElement) {
                 mediaElement.currentTime = 0;
                 mediaElement.pause();
+                startTime = 0;
+                endTime = mediaElement.duration;
             }
-
-            startTime = 0;
-            endTime = mediaElement?.duration || 0;
 
             // Update sliders
             document.getElementById('start-slider').value = startTime;
@@ -320,6 +464,138 @@
             }
         }
 
+        function getYoutubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : url;
+        }
+
+        function onYouTubeIframeAPIReady() {
+            // This function will be called when the YouTube API is ready
+            document.getElementById('loadYoutube').addEventListener('click', loadYoutubeVideo);
+        }
+
+        function loadYoutubeVideo() {
+            const url = document.getElementById('youtubeUrl').value;
+            const videoId = getYoutubeId(url);
+            
+            if (!videoId) return;
+
+            // Reset both inputs' styles first
+            resetSourceStyles();
+            
+            // Update input styling
+            document.getElementById('youtubeUrl').classList.add('active-source');
+            document.getElementById('fileInput').classList.add('inactive-source');
+            document.getElementById('fileInput').value = ''; // Clear file input
+
+            // Clear any existing media
+            if (mediaElement) {
+                mediaElement.pause();
+                mediaElement.remove();
+                mediaElement = null;
+            }
+
+            // Reset player wrapper
+            const mediaWrapper = document.getElementById('playerWrapper');
+            mediaWrapper.innerHTML = '<div id="youtubePlayer"></div>';
+            
+            isYoutubeVideo = true;
+            
+            // Reset loop state
+            isLooping = false;
+            document.getElementById('toggleLoop').innerText = 'Start Loop';
+
+            // Destroy existing YouTube player if it exists
+            if (youtubePlayer) {
+                youtubePlayer.destroy();
+            }
+
+            // Create new YouTube player
+            youtubePlayer = new YT.Player('youtubePlayer', {
+                height: '360',
+                width: '640',
+                videoId: videoId,
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+            
+            document.getElementById('mediaControls').style.display = 'block';
+        }
+
+        function onPlayerReady(event) {
+            const duration = event.target.getDuration();
+            
+            // Reset loop values
+            startTime = 0;
+            endTime = duration;
+
+            // Update sliders
+            document.getElementById('start-slider').max = duration;
+            document.getElementById('start-slider').value = startTime;
+            document.getElementById('end-slider').max = duration;
+            document.getElementById('end-slider').value = endTime;
+
+            // Update input fields
+            updateFields('start', secondsToTimeParts(startTime));
+            updateFields('end', secondsToTimeParts(endTime));
+
+            // Clear any existing interval
+            if (window.youtubeChecker) {
+                clearInterval(window.youtubeChecker);
+                window.youtubeChecker = null;
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                // Start checking the loop
+                if (!window.youtubeChecker) {
+                    window.youtubeChecker = setInterval(checkYoutubeLoop, 100);
+                }
+            } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+                clearInterval(window.youtubeChecker);
+                window.youtubeChecker = null;
+            }
+        }
+
+        function checkYoutubeLoop() {
+            if (!youtubePlayer) return;
+            
+            const currentTime = youtubePlayer.getCurrentTime();
+            
+            if (startTime >= endTime) {
+                youtubePlayer.pauseVideo();
+                youtubePlayer.seekTo(startTime);
+                return;
+            }
+
+            if (isLooping && currentTime >= endTime) {
+                youtubePlayer.seekTo(startTime);
+            }
+        }
+
+        function resetSourceStyles() {
+            const youtubeInput = document.getElementById('youtubeUrl');
+            const fileInput = document.getElementById('fileInput');
+            
+            youtubeInput.classList.remove('active-source', 'inactive-source');
+            fileInput.classList.remove('active-source', 'inactive-source');
+        }
+
+        // Generate QR code
+        window.onload = function() {
+            new QRCode(document.getElementById("qrcode"), {
+                text: "0xaf8817fe4ec64888f8a4586cf6b1432058a80066",
+                width: 128,
+                height: 128,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        };
 
     </script>
 </body>
