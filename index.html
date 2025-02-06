@@ -233,6 +233,18 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+        .repeat-counter {
+            font-size: 0.8em;
+            color: #666;
+            margin-left: 10px;
+            font-weight: normal;
+        }
+        #exportPlaylist, #importPlaylist {
+            background: #2196F3;  /* Different color to distinguish from other buttons */
+        }
+        #exportPlaylist:hover, #importPlaylist:hover {
+            background: #1976D2;
+        }
     </style>
 </head>
 <body>
@@ -248,6 +260,11 @@
                 <input type="text" id="youtubeUrl" placeholder="Enter YouTube URL">
                 <button id="loadYoutube">Load YouTube Video</button>
             </div>
+            <div class="input-row">
+                <button id="exportPlaylist">Export Playlist</button>
+                <button id="importPlaylist">Import Playlist</button>
+                <input type="file" id="importInput" accept=".json" style="display: none;">
+            </div>
         </div>
 
         <div id="playerWrapper">
@@ -256,7 +273,7 @@
 
         <div class="controls-container">
             <div id="playlist-container">
-                <h1>Playlist</h1>
+                <h1 id="playlist-header">Playlist <span class="repeat-counter">0 repeats</span></h1>
                 <div id="playlist" class="playlist">
                     <!-- Playlist items will be added here dynamically -->
                 </div>
@@ -321,6 +338,7 @@
         let currentPlayingIndex = -1;
         let continuePlaylist = false;
         let db;
+        let repeatCount = 0;
 
         const initDB = () => {
             return new Promise((resolve, reject) => {
@@ -378,7 +396,7 @@
                 };
                 request.onerror = () => reject(request.error);
             });
-        }
+        };
 
         // Update the file picker event listener to handle initialization errors
         document.getElementById('filePickerButton').addEventListener('click', async () => {
@@ -522,14 +540,16 @@
         }
 
         function checkLoop() {
+            if (!mediaElement) return;
+
             if (startTime >= endTime) {
                 // Stop playback if start time is greater or equal to end time
                 mediaElement.pause();
-                mediaElement.currentTime = startTime; // Reset to start time
+                mediaElement.currentTime = startTime;
                 return;
             }
 
-            // Normal looping behavior
+            // Check if we're at or past the end time
             if (isLooping && mediaElement.currentTime >= endTime) {
                 mediaElement.currentTime = startTime;
                 mediaElement.play();
@@ -585,13 +605,17 @@
             document.getElementById('toggleLoop').innerText = 'Start Loop';
         }
 
-
         function updateStartTimeFromSlider() {
             startTime = parseFloat(document.getElementById('start-slider').value);
             const timeParts = secondsToTimeParts(startTime);
             updateFields('start', timeParts);
+            
+            // Save the new timing to the current playlist item
+            if (currentPlayingIndex !== -1 && playlist[currentPlayingIndex]) {
+                playlist[currentPlayingIndex].startTime = startTime;
+                savePlaylist();
+            }
 
-            // Validate after updating the start time
             validateTimeInputs();
         }
 
@@ -599,8 +623,13 @@
             endTime = parseFloat(document.getElementById('end-slider').value);
             const timeParts = secondsToTimeParts(endTime);
             updateFields('end', timeParts);
+            
+            // Save the new timing to the current playlist item
+            if (currentPlayingIndex !== -1 && playlist[currentPlayingIndex]) {
+                playlist[currentPlayingIndex].endTime = endTime;
+                savePlaylist();
+            }
 
-            // Validate after updating the end time
             validateTimeInputs();
         }
 
@@ -619,7 +648,6 @@
             // Validate time inputs
             validateTimeInputs();
         }
-
 
         function updateEndTimeManually() {
             const endParts = getFields('end'); // Get the MM:SS:MSMS parts from the input fields
@@ -641,8 +669,6 @@
             const { minutes, seconds: secs, milliseconds } = secondsToTimeParts(seconds);
             return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}:${String(milliseconds).padStart(3, '0')}`;
         }
-
-
 
         function updateFields(type, { minutes, seconds, milliseconds }) {
             document.getElementById(`${type}-minutes`).value = minutes;
@@ -846,7 +872,11 @@
 
                 for (const item of savedPlaylist) {
                     if (item.type === 'youtube') {
-                        playlist.push(item);
+                        playlist.push({
+                            ...item,
+                            startTime: item.startTime ?? 0,
+                            endTime: item.endTime ?? 30
+                        });
                     } else if (item.type === 'file') {
                         try {
                             const file = await getFile(item.title);
@@ -854,7 +884,9 @@
                                 playlist.push({
                                     type: 'file',
                                     file: file,
-                                    title: item.title
+                                    title: item.title,
+                                    startTime: item.startTime ?? 0,
+                                    endTime: item.endTime ?? 30
                                 });
                             } else {
                                 throw new Error('File not found in storage');
@@ -864,7 +896,9 @@
                             playlist.push({
                                 ...item,
                                 disabled: true,
-                                title: `${item.title} (File not found)`
+                                title: `${item.title} (File not found)`,
+                                startTime: item.startTime ?? 0,
+                                endTime: item.endTime ?? 30
                             });
                         }
                     }
@@ -877,10 +911,13 @@
 
         function addToPlaylist(item) {
             const wasEmpty = playlist.length === 0;
-            playlist.push(item);
+            playlist.push({
+                ...item,
+                startTime: 0,
+                endTime: 30  // Default end time
+            });
             renderPlaylist();
             
-            // Only autoplay if playlist was empty and no media is currently playing
             if (wasEmpty && currentPlayingIndex === -1) {
                 playItem(playlist.length - 1);
             }
@@ -889,6 +926,11 @@
         function renderPlaylist() {
             const playlistEl = document.getElementById('playlist');
             playlistEl.innerHTML = '';
+
+            // Update the playlist heading with repeat count
+            document.getElementById('playlist-header').innerHTML = `
+                Playlist <span class="repeat-counter">${repeatCount} repeats</span>
+            `;
 
             playlist.forEach((item, index) => {
                 const itemEl = document.createElement('div');
@@ -913,7 +955,17 @@
             currentPlayingIndex = index;
             const item = playlist[index];
 
-            if (!item) return; // Guard against invalid items
+            if (!item) return;
+
+            // Restore timing information for this item
+            startTime = item.startTime ?? 0;
+            endTime = item.endTime ?? 30;
+
+            // Update the controls with the restored timing information
+            updateFields('start', secondsToTimeParts(startTime));
+            updateFields('end', secondsToTimeParts(endTime));
+            document.getElementById('start-slider').value = startTime;
+            document.getElementById('end-slider').value = endTime;
 
             if (item.type === 'youtube') {
                 if (youtubePlayer) {
@@ -970,7 +1022,9 @@
             const playlistData = playlist.map(item => ({
                 type: item.type,
                 title: item.title,
-                videoId: item.type === 'youtube' ? item.videoId : undefined
+                videoId: item.type === 'youtube' ? item.videoId : undefined,
+                startTime: item.startTime ?? 0,
+                endTime: item.endTime ?? 30
             }));
             localStorage.setItem('playlist', JSON.stringify(playlistData));
         }
@@ -980,6 +1034,8 @@
                 let nextIndex = currentPlayingIndex + 1;
                 if (nextIndex >= playlist.length) {
                     nextIndex = 0; // Loop back to the beginning
+                    repeatCount++; // Increment counter when playlist loops
+                    renderPlaylist(); // Update the display
                 }
                 if (nextIndex !== currentPlayingIndex) {
                     playItem(nextIndex);
@@ -988,7 +1044,7 @@
         }
 
         function playLocalFile(file) {
-            if (!file) return; // Guard against missing files
+            if (!file) return;
 
             // Clear YouTube player if it exists
             if (youtubePlayer) {
@@ -1019,9 +1075,15 @@
 
                 mediaElement.addEventListener('loadedmetadata', () => {
                     const duration = mediaElement.duration;
-                    startTime = 0;
-                    endTime = duration;
+                    
+                    // Only set default values if they haven't been stored
+                    const currentItem = playlist[currentPlayingIndex];
+                    if (!currentItem.startTime && !currentItem.endTime) {
+                        startTime = 0;
+                        endTime = duration;
+                    }
 
+                    // Update sliders with current values
                     document.getElementById('start-slider').max = duration;
                     document.getElementById('start-slider').value = startTime;
                     document.getElementById('end-slider').max = duration;
@@ -1036,6 +1098,11 @@
 
                 mediaElement.addEventListener('timeupdate', checkLoop);
                 mediaElement.addEventListener('ended', handleMediaEnd);
+                mediaElement.addEventListener('seeking', () => {
+                    if (isLooping && mediaElement.currentTime >= endTime) {
+                        mediaElement.currentTime = startTime;
+                    }
+                });
             } else {
                 console.error('Invalid file type:', file.type);
             }
@@ -1059,6 +1126,95 @@
                 }
             }
         });
+
+        // Add these functions to handle export/import
+        async function exportPlaylist() {
+            try {
+                const exportData = {
+                    playlist: playlist.map(item => ({
+                        type: item.type,
+                        title: item.title,
+                        videoId: item.type === 'youtube' ? item.videoId : undefined,
+                        startTime: item.startTime,
+                        endTime: item.endTime
+                    })),
+                    repeatCount: repeatCount
+                };
+
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `playlist_export_${timestamp}.json`;
+                
+                // Create blob and trigger download
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const downloadUrl = window.URL.createObjectURL(blob);
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = filename;
+                downloadLink.click();
+                
+                window.URL.revokeObjectURL(downloadUrl);
+                
+                alert('Playlist structure exported! Please save your media files separately.');
+            } catch (err) {
+                console.error('Error exporting playlist:', err);
+                alert('Error exporting playlist: ' + err.message);
+            }
+        }
+
+        async function importPlaylist() {
+            const input = document.getElementById('importInput');
+            input.click();
+        }
+
+        async function handleImport(event) {
+            try {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const text = await file.text();
+                const importData = JSON.parse(text);
+
+                // Clear existing playlist
+                playlist = [];
+
+                // Import the playlist structure
+                for (const item of importData.playlist) {
+                    if (item.type === 'youtube') {
+                        playlist.push({
+                            type: 'youtube',
+                            title: item.title,
+                            videoId: item.videoId,
+                            startTime: item.startTime,
+                            endTime: item.endTime
+                        });
+                    } else if (item.type === 'file') {
+                        playlist.push({
+                            ...item,
+                            disabled: true,
+                            title: `${item.title} (File needed)`,
+                        });
+                    }
+                }
+
+                // Restore repeat count
+                repeatCount = importData.repeatCount || 0;
+
+                // Save and render the playlist
+                savePlaylist();
+                renderPlaylist();
+
+                alert('Playlist structure imported! Please add your media files again.');
+            } catch (err) {
+                console.error('Error importing playlist:', err);
+                alert('Error importing playlist');
+            }
+        }
+
+        // Add event listeners
+        document.getElementById('exportPlaylist').addEventListener('click', exportPlaylist);
+        document.getElementById('importPlaylist').addEventListener('click', importPlaylist);
+        document.getElementById('importInput').addEventListener('change', handleImport);
 
     </script>
 </body>
