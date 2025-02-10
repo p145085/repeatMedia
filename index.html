@@ -993,7 +993,7 @@
                     }
                 });
             } else if (item.type === 'file' && item.file) {
-                playLocalFile(item.file);
+                playFile(item.file);
             }
 
             document.getElementById('mediaControls').style.display = 'block';
@@ -1043,69 +1043,87 @@
             }
         }
 
-        function playLocalFile(file) {
-            if (!file) return;
-
-            // Clear YouTube player if it exists
+        // Add cleanup function
+        function cleanupMedia() {
+            // Clean up YouTube player
             if (youtubePlayer) {
                 youtubePlayer.destroy();
                 youtubePlayer = null;
             }
-            isYoutubeVideo = false;
-
-            // Clear existing media element if it exists
+            
+            // Clean up media element
             if (mediaElement) {
                 mediaElement.pause();
+                mediaElement.removeEventListener('ended', onMediaEnd);
+                mediaElement.removeEventListener('timeupdate', checkLoop);
                 mediaElement.remove();
                 mediaElement = null;
             }
+            
+            // Clear any existing YouTube checker interval
+            if (window.youtubeChecker) {
+                clearInterval(window.youtubeChecker);
+                window.youtubeChecker = null;
+            }
+
+            // Clear the player wrapper
+            const mediaWrapper = document.getElementById('playerWrapper');
+            mediaWrapper.innerHTML = '';
+        }
+
+        // Update playFile function to clean up first
+        async function playFile(file) {
+            // Clean up existing media before creating new one
+            cleanupMedia();
 
             const mediaWrapper = document.getElementById('playerWrapper');
-            mediaWrapper.innerHTML = '<div id="youtubePlayer"></div>';
+            isYoutubeVideo = false;
 
-            // Check if file is a valid media file
-            if (file.type && (file.type.startsWith('video') || file.type.startsWith('audio'))) {
-                mediaElement = document.createElement(file.type.startsWith('video') ? 'video' : 'audio');
-                mediaElement.src = URL.createObjectURL(file);
-                mediaElement.controls = true;
-                mediaElement.id = "media-player";
-                mediaWrapper.appendChild(mediaElement);
+            if (file.type.startsWith('video')) {
+                mediaElement = document.createElement('video');
+            } else if (file.type.startsWith('audio')) {
+                mediaElement = document.createElement('audio');
+            }
 
-                document.getElementById('mediaControls').style.display = 'block';
+            const url = URL.createObjectURL(file);
+            mediaElement.src = url;
+            mediaElement.controls = true;
+            mediaWrapper.appendChild(mediaElement);
 
+            // Add event listeners
+            mediaElement.addEventListener('ended', onMediaEnd);
+            mediaElement.addEventListener('timeupdate', checkLoop);
+
+            // Clean up the blob URL when media is removed
+            mediaElement.onended = () => URL.revokeObjectURL(url);
+
+            // Set up media element
+            await new Promise(resolve => {
                 mediaElement.addEventListener('loadedmetadata', () => {
-                    const duration = mediaElement.duration;
-                    
-                    // Only set default values if they haven't been stored
-                    const currentItem = playlist[currentPlayingIndex];
-                    if (!currentItem.startTime && !currentItem.endTime) {
-                        startTime = 0;
-                        endTime = duration;
-                    }
+                    // Set start time to 0 and end time to full duration
+                    startTime = 0;
+                    endTime = mediaElement.duration;
+                    console.log('Setting initial end time to:', endTime);
 
-                    // Update sliders with current values
-                    document.getElementById('start-slider').max = duration;
+                    // Update controls with full duration
+                    document.getElementById('start-slider').max = endTime;
+                    document.getElementById('end-slider').max = endTime;
                     document.getElementById('start-slider').value = startTime;
-                    document.getElementById('end-slider').max = duration;
                     document.getElementById('end-slider').value = endTime;
 
+                    // Update time input fields
                     updateFields('start', secondsToTimeParts(startTime));
                     updateFields('end', secondsToTimeParts(endTime));
-                    
-                    // Autoplay when loaded
-                    mediaElement.play();
-                });
 
-                mediaElement.addEventListener('timeupdate', checkLoop);
-                mediaElement.addEventListener('ended', handleMediaEnd);
-                mediaElement.addEventListener('seeking', () => {
-                    if (isLooping && mediaElement.currentTime >= endTime) {
-                        mediaElement.currentTime = startTime;
-                    }
+                    // Check loop state
+                    const loopButton = document.getElementById('toggleLoop');
+                    isLooping = loopButton.innerText === 'Stop Loop';
+
+                    mediaElement.play();
+                    document.getElementById('mediaControls').style.display = 'block';
+                    resolve();
                 });
-            } else {
-                console.error('Invalid file type:', file.type);
-            }
+            });
         }
 
         // Add event listener for the continue checkbox
@@ -1215,6 +1233,38 @@
         document.getElementById('exportPlaylist').addEventListener('click', exportPlaylist);
         document.getElementById('importPlaylist').addEventListener('click', importPlaylist);
         document.getElementById('importInput').addEventListener('change', handleImport);
+
+        // Add this function to handle media end events
+        function onMediaEnd() {
+            console.log('Media ended, checking continue status...');
+            const continuePlaylist = document.getElementById('continuePlaylist').checked;
+            
+            if (continuePlaylist) {
+                console.log('Continue is checked, playing next item');
+                cleanupMedia();
+                playNextInPlaylist();
+            } else if (isLooping) {
+                console.log('Looping current item');
+                if (isYoutubeVideo && youtubePlayer) {
+                    youtubePlayer.seekTo(startTime);
+                    youtubePlayer.playVideo();
+                } else if (mediaElement) {
+                    mediaElement.currentTime = startTime;
+                    mediaElement.play();
+                }
+            }
+        }
+
+        // Add helper function for playing next item
+        function playNextInPlaylist() {
+            let nextIndex = currentPlayingIndex + 1;
+            if (nextIndex >= playlist.length) {
+                nextIndex = 0; // Loop back to beginning
+            }
+            if (nextIndex !== currentPlayingIndex) {
+                playItem(nextIndex);
+            }
+        }
 
     </script>
 </body>
