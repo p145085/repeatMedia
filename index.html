@@ -398,6 +398,48 @@
             });
         };
 
+        // Create a hidden file input for fallback
+        let fileInputFallback = null;
+        let directoryInputFallback = null;
+
+        function createFileInputFallback() {
+            if (!fileInputFallback) {
+                fileInputFallback = document.createElement('input');
+                fileInputFallback.type = 'file';
+                fileInputFallback.multiple = true;
+                fileInputFallback.accept = 'audio/*,video/*';
+                fileInputFallback.style.display = 'none';
+                document.body.appendChild(fileInputFallback);
+                
+                fileInputFallback.addEventListener('change', async (e) => {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                        try {
+                            if (!db) {
+                                await initDB();
+                            }
+                            for (const file of files) {
+                                if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                                    await storeFile(file);
+                                    addToPlaylist({
+                                        type: 'file',
+                                        file: file,
+                                        title: file.name
+                                    });
+                                }
+                            }
+                            savePlaylist();
+                        } catch (err) {
+                            console.error('Error processing files:', err);
+                            alert('Error processing files: ' + err.message);
+                        }
+                    }
+                    e.target.value = ''; // Reset input
+                });
+            }
+            return fileInputFallback;
+        }
+
         // Update the file picker event listener to handle initialization errors
         document.getElementById('filePickerButton').addEventListener('click', async () => {
             try {
@@ -405,35 +447,92 @@
                     await initDB();
                 }
 
-                const handles = await window.showOpenFilePicker({
-                    multiple: true,
-                    types: [
-                        {
-                            description: 'Media Files',
-                            accept: {
-                                'audio/*': ['.mp3', '.wav', '.ogg'],
-                                'video/*': ['.mp4', '.webm', '.mov']
+                // Check if File System Access API is available
+                if (window.showOpenFilePicker) {
+                    const handles = await window.showOpenFilePicker({
+                        multiple: true,
+                        types: [
+                            {
+                                description: 'Media Files',
+                                accept: {
+                                    'audio/*': ['.mp3', '.wav', '.ogg'],
+                                    'video/*': ['.mp4', '.webm', '.mov']
+                                }
                             }
-                        }
-                    ]
-                });
+                        ]
+                    });
 
-                for (const handle of handles) {
-                    const file = await handle.getFile();
-                    if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
-                        await storeFile(file);
-                        addToPlaylist({
-                            type: 'file',
-                            file: file,
-                            title: file.name
-                        });
+                    for (const handle of handles) {
+                        const file = await handle.getFile();
+                        if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                            await storeFile(file);
+                            addToPlaylist({
+                                type: 'file',
+                                file: file,
+                                title: file.name
+                            });
+                        }
                     }
+                    savePlaylist();
+                } else {
+                    // Fallback to traditional file input
+                    const input = createFileInputFallback();
+                    input.click();
                 }
-                savePlaylist();
             } catch (err) {
+                // If user cancels, don't show error. Otherwise, fallback to traditional input
+                if (err.name === 'AbortError') {
+                    return; // User cancelled, do nothing
+                }
                 console.error('Error selecting files:', err);
+                // Fallback to traditional file input
+                try {
+                    const input = createFileInputFallback();
+                    input.click();
+                } catch (fallbackErr) {
+                    alert('Error selecting files: ' + err.message);
+                }
             }
         });
+
+        function createDirectoryInputFallback() {
+            if (!directoryInputFallback) {
+                directoryInputFallback = document.createElement('input');
+                directoryInputFallback.type = 'file';
+                directoryInputFallback.multiple = true;
+                directoryInputFallback.webkitdirectory = true;
+                directoryInputFallback.accept = 'audio/*,video/*';
+                directoryInputFallback.style.display = 'none';
+                document.body.appendChild(directoryInputFallback);
+                
+                directoryInputFallback.addEventListener('change', async (e) => {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                        try {
+                            if (!db) {
+                                await initDB();
+                            }
+                            for (const file of files) {
+                                if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                                    await storeFile(file);
+                                    addToPlaylist({
+                                        type: 'file',
+                                        file: file,
+                                        title: file.name
+                                    });
+                                }
+                            }
+                            savePlaylist();
+                        } catch (err) {
+                            console.error('Error processing directory:', err);
+                            alert('Error processing directory: ' + err.message);
+                        }
+                    }
+                    e.target.value = ''; // Reset input
+                });
+            }
+            return directoryInputFallback;
+        }
 
         // Add the directory picker event listener
         document.getElementById('directoryPickerButton').addEventListener('click', async () => {
@@ -442,27 +541,45 @@
                     await initDB();
                 }
 
-                const dirHandle = await window.showDirectoryPicker();
-                
-                // Get all media files from the directory
-                for await (const entry of dirHandle.values()) {
-                    if (entry.kind === 'file') {
-                        const file = await entry.getFile();
-                        if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
-                            // Store the file in IndexedDB
-                            await storeFile(file);
-                            
-                            addToPlaylist({
-                                type: 'file',
-                                file: file,
-                                title: file.name
-                            });
+                // Check if File System Access API is available
+                if (window.showDirectoryPicker) {
+                    const dirHandle = await window.showDirectoryPicker();
+                    
+                    // Get all media files from the directory
+                    for await (const entry of dirHandle.values()) {
+                        if (entry.kind === 'file') {
+                            const file = await entry.getFile();
+                            if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                                // Store the file in IndexedDB
+                                await storeFile(file);
+                                
+                                addToPlaylist({
+                                    type: 'file',
+                                    file: file,
+                                    title: file.name
+                                });
+                            }
                         }
                     }
+                    savePlaylist();
+                } else {
+                    // Fallback to traditional directory input
+                    const input = createDirectoryInputFallback();
+                    input.click();
                 }
-                savePlaylist();
             } catch (err) {
+                // If user cancels, don't show error. Otherwise, fallback to traditional input
+                if (err.name === 'AbortError') {
+                    return; // User cancelled, do nothing
+                }
                 console.error('Error selecting directory:', err);
+                // Fallback to traditional directory input
+                try {
+                    const input = createDirectoryInputFallback();
+                    input.click();
+                } catch (fallbackErr) {
+                    alert('Error selecting directory: ' + err.message + '\n\nNote: Directory picker requires HTTPS or localhost. Using fallback method.');
+                }
             }
         });
 
