@@ -23,7 +23,7 @@
 
 ## 🌐 Access
 
-Explore repeatMedia now: [populus.ddns.net/repeat](http://populus.ddns.net/repeat)
+Explore repeatMedia now: [populus.blog/repeatMedia](https://populus.blog/repeatMedia)
 
 ---
 
